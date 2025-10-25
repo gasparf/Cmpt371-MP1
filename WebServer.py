@@ -12,6 +12,18 @@ print ('The server is ready to receive')
 # insert HTTP responses for code 200, 403
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 while True: # Loop forever
      # Server waits on accept for incoming requests.
      # New socket created on return
@@ -19,6 +31,16 @@ while True: # Loop forever
      
      # Read from socket (but not address as in UDP)
      sentence = connectionSocket.recv(1024).decode()
+
+
+     #404
+     
+
+
+
+
+
+
      
      # Send the reply
      capitalizedSentence = sentence.upper()
