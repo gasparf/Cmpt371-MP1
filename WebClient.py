@@ -6,9 +6,14 @@ serverPort = 12000
 clientSocket = socket(AF_INET, SOCK_STREAM)
 clientSocket.connect((serverName, serverPort))
 
-sentence = input('Input lowercase sentence:')
+request_line = b"GET / HTTP/9.9\r\n"
+headers = b"Host: " + serverName.encode() + b"\r\n"
+headers += b"User-Agent: CustomClient/1.0\r\n"
+headers += b"\r\n"
 
-clientSocket.send(sentence.encode())
+full_request = request_line + headers
+
+clientSocket.send(full_request)
 
 modifiedSentence = clientSocket.recv(1024)
 
