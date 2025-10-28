@@ -18,12 +18,11 @@ print ('The server is ready to receive')
 
 # used for 304 code to check when last modified
 def _http_date_from_ts(ts: float) -> str:
-     """Format epoch timestamp to RFC 7231 IMF-fixdate (e.g., 'Sun, 06 Nov 1994 08:49:37 GMT')."""
+     # Format epoch timestamp to RFC 7231 IMF-fixdate (e.g., 'Sun, 06 Nov 1994 08:49:37 GMT').
      return format_datetime(datetime.fromtimestamp(ts, timezone.utc), usegmt=True)
 
-# check is forbidden for 403 seperately to be called in serve_html_file
+# check isforbidden for 403 seperately to be called in serve_html_file
 def _is_forbidden(requested_path: str) -> bool:
-     """Return True if the requested path should be forbidden (403)."""
      # Normalize and resolve path under serverRoot
      abs_root = os.path.abspath(serverRoot)
      abs_target = os.path.abspath(os.path.join(serverRoot, requested_path))
@@ -75,24 +74,26 @@ def serve_html_file(file_name, request_headers=None):
                          ims_dt = None
 
                     if os.path.isfile(file_path):
-                         mtime = os.path.getmtime(file_path)
-                         last_mod_dt = datetime.fromtimestamp(mtime, timezone.utc)
+                         # Round to whole seconds to avoid sub-second timing diff vs header precision
+                         mtime_sec = int(os.path.getmtime(file_path))
+                         last_mod_dt = datetime.fromtimestamp(mtime_sec, timezone.utc)
                          if ims_dt is not None and last_mod_dt <= ims_dt:
                               headers = (
                                    b"HTTP/1.1 304 Not Modified\r\n"
                                    b"Date: " + _http_date_from_ts(datetime.now(timezone.utc).timestamp()).encode() + b"\r\n"
-                                   b"Last-Modified: " + _http_date_from_ts(mtime).encode() + b"\r\n"
+                                   b"Last-Modified: " + _http_date_from_ts(mtime_sec).encode() + b"\r\n"
                                    b"Connection: close\r\n\r\n"
                               )
                               return headers  # no body for 304
 
                with open(file_path, 'rb') as f:
                     content = f.read()
-               mtime = os.path.getmtime(file_path)
+               # Round to whole seconds to align with HTTP-date precision
+               mtime_sec = int(os.path.getmtime(file_path))
                headers = (
                     b"HTTP/1.1 200 OK\r\n"
                     b"Content-Type: text/html\r\n"
-                    b"Last-Modified: " + _http_date_from_ts(mtime).encode() + b"\r\n"
+                    b"Last-Modified: " + _http_date_from_ts(mtime_sec).encode() + b"\r\n"
                     b"Content-Length: " + str(len(content)).encode() + b"\r\n"
                     b"Connection: close\r\n\r\n"
                )
@@ -167,6 +168,8 @@ while True: # Loop forever
                     b"HTTP/1.1 505 HTTP Version Not Supported\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n"
                     + b"<h1>505 HTTP Version Not Supported</h1><p>This is Yan Ting and we don't recognize the http format.</p>"
                )
+
+    
 
 
      
