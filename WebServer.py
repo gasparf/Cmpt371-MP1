@@ -47,7 +47,7 @@ def _is_forbidden(requested_path: str) -> bool:
 
 
 
-#404 and 200
+#404 & 200 & 403 & 304
 def serve_html_file(file_name, request_headers=None):
      """Serve a file with basic 200/404 handling and conditional 304 if applicable."""
      file_path = os.path.join(serverRoot, file_name)
@@ -141,14 +141,8 @@ while True: # Loop forever
      if sentence.startswith("GET"):
           # Parse request line and headers
           lines = sentence.split("\r\n")
-          try:
-               request_line = lines[0]
-               method, target, html_version = request_line.split()
-          except ValueError:
-               response = b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-               connectionSocket.send(response)
-               connectionSocket.close()
-               continue
+          request_line = lines[0]
+          method, target, html_version = request_line.split()
 
           # Build headers dict (case-insensitive)
           headers = {}
