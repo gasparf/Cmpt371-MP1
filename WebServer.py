@@ -49,7 +49,6 @@ def _is_forbidden(requested_path: str) -> bool:
 
 #404 & 200 & 403 & 304
 def serve_html_file(file_name, request_headers=None):
-     """Serve a file with basic 200/404 handling and conditional 304 if applicable."""
      file_path = os.path.join(serverRoot, file_name)
      if len(file_name) > 1:
           # 403 Forbidden checks
@@ -107,7 +106,8 @@ def serve_html_file(file_name, request_headers=None):
                     b"Connection: close\r\n\r\n"
                )
                return headers + error_content
-          except PermissionError:
+           # alternative way to test 403 error for .hidden files or insufficient permissions
+          except PermissionError: 
                error_content = b"<h1>403 Forbidden</h1><p>Insufficient permissions to read the resource.</p>"
                headers = (
                     b"HTTP/1.1 403 Forbidden\r\n"
@@ -162,10 +162,6 @@ while True: # Loop forever
                     b"HTTP/1.1 505 HTTP Version Not Supported\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n"
                     + b"<h1>505 HTTP Version Not Supported</h1><p>This is Yan Ting and we don't recognize the http format.</p>"
                )
-
-    
-
-
      
      # Send the reply
      connectionSocket.send(response)
