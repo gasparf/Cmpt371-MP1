@@ -1,5 +1,6 @@
 from socket import *
 import os
+import threading
 from datetime import datetime, timezone
 from email.utils import format_datetime, parsedate_to_datetime
 
@@ -21,14 +22,14 @@ def _http_date_from_ts(ts: float) -> str:
      # Format epoch timestamp to RFC 7231 IMF-fixdate (e.g., 'Sun, 06 Nov 1994 08:49:37 GMT').
      return format_datetime(datetime.fromtimestamp(ts, timezone.utc), usegmt=True)
 
-# check isforbidden for 403 seperately to be called in serve_html_file
 def _is_forbidden(requested_path: str) -> bool:
      # Normalize and resolve path under serverRoot
      abs_root = os.path.abspath(serverRoot)
      abs_target = os.path.abspath(os.path.join(serverRoot, requested_path))
 
      # Block path traversal outside of root
-     if not abs_target.startswith(abs_root + os.sep) and abs_target != abs_root:
+     # Allow if target is inside root (starts with root/) or is exactly root
+     if not (abs_target.startswith(abs_root + os.sep) or abs_target == abs_root):
           return True
 
      # Block access to hidden files/dirs (starting with '.')
@@ -121,9 +122,46 @@ def serve_html_file(file_name, request_headers=None):
           return b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n"
 
 
+def handle_client(connectionSocket, addr):
+     try:
+          # Read from socket (but not address as in UDP)
+          sentence = connectionSocket.recv(1024).decode()
 
+          print(f"[Thread {threading.current_thread().name}] Request from {addr}")
+          print(sentence)  # see actual http request with header
 
+          if sentence.startswith("GET"):
+               # Parse request line and headers
+               lines = sentence.split("\r\n")
+               request_line = lines[0]
+               method, target, html_version = request_line.split()
 
+               # Build headers dict (case-insensitive)
+               headers = {}
+               for line in lines[1:]:
+                    if not line:
+                         break
+                    if ":" in line:
+                         k, v = line.split(":", 1)
+                         headers[k.strip().lower()] = v.strip()
+
+               path = target[1:]
+               print(html_version)
+               if (html_version == "HTTP/1.1" or html_version == "HTTP/1.0"):
+                    response = serve_html_file(path, headers)
+               else:  # 505
+                    response = (
+                         b"HTTP/1.1 505 HTTP Version Not Supported\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n"
+                         + b"<h1>505 HTTP Version Not Supported</h1><p>This is Yan Ting and we don't recognize the http format.</p>"
+                    )
+          
+          # Send the reply
+          connectionSocket.send(response)
+     except Exception as e:
+          print(f"Error handling client {addr}: {e}")
+     finally:
+          # Close connection to client
+          connectionSocket.close()
 
 
 while True: # Loop forever
@@ -131,42 +169,10 @@ while True: # Loop forever
      # New socket created on return
      connectionSocket, addr = serverSocket.accept()
      
-     # Read from socket (but not address as in UDP)
-     sentence = connectionSocket.recv(1024).decode()
-
-
-     #404
-     print(sentence) #see actual http request with header
-
-     if sentence.startswith("GET"):
-          # Parse request line and headers
-          lines = sentence.split("\r\n")
-          request_line = lines[0]
-          method, target, html_version = request_line.split()
-
-          # Build headers dict (case-insensitive)
-          headers = {}
-          for line in lines[1:]:
-               if not line:
-                    break
-               if ":" in line:
-                    k, v = line.split(":", 1)
-                    headers[k.strip().lower()] = v.strip()
-
-          path = target[1:]
-          print(html_version)
-          if (html_version == "HTTP/1.1" or html_version == "HTTP/1.0"):
-               response = serve_html_file(path, headers)
-          else:  # 505
-               response = (
-                    b"HTTP/1.1 505 HTTP Version Not Supported\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n"
-                    + b"<h1>505 HTTP Version Not Supported</h1><p>This is Yan Ting and we don't recognize the http format.</p>"
-               )
-     
-     # Send the reply
-     connectionSocket.send(response)
-     
-     # Close connection to client (but not welcoming socket)
-     connectionSocket.close()
+     # Create and start a new thread for each client
+     client_thread = threading.Thread(target=handle_client, args=(connectionSocket, addr))
+     client_thread.daemon = True  # Thread will exit when main program exits
+     client_thread.start()
+     print(f"Started thread {client_thread.name} for client {addr}")
 
 

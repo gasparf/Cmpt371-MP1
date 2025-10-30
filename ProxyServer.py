@@ -41,28 +41,27 @@ while True:
         # Determine target host and port
         # For absolute URLs: http://host:port/path
         # For relative paths: assume localhost:12000 (WebServer)
-        # if target.startswith("http://"):
-        #     # Parse absolute URL
-        #     url_part = target[7:]  # Remove "http://"
-        #     if "/" in url_part:
-        #         host_port, path = url_part.split("/", 1)
-        #         path = "/" + path
-        #     else:
-        #         host_port = url_part
-        #         path = "/"
+        if target.startswith("http://"):
+            # Parse absolute URL
+            url_part = target[7:]  # Remove "http://"
+            if "/" in url_part:
+                host_port, path = url_part.split("/", 1)
+                path = "/" + path
+            else:
+                host_port = url_part
+                path = "/"
             
-        #     if ":" in host_port:
-        #         targetHost, targetPort = host_port.split(":")
-        #         targetPort = int(targetPort)
-        #     else:
-        #         targetHost = host_port
-        #         targetPort = 80
-        # else:
-        
-        # Relative path - forward to local WebServer
-        targetHost = "localhost"
-        targetPort = 12000
-        path = target
+            if ":" in host_port:
+                targetHost, targetPort = host_port.split(":")
+                targetPort = int(targetPort)
+            else:
+                targetHost = host_port
+                targetPort = 80
+        else:
+            # Relative path - forward to local WebServer
+            targetHost = "localhost"
+            targetPort = 12000
+            path = target
         
         print(f"Forwarding to {targetHost}:{targetPort}{path}")
         
@@ -70,8 +69,19 @@ while True:
         serverSocket = socket(AF_INET, SOCK_STREAM)
         serverSocket.connect((targetHost, targetPort))
         
-        # Forward the request to target server
-        serverSocket.send(request)
+        # Reconstruct request with relative path for the target server
+        # Replace absolute URL with just the path in the request line
+        modified_request_line = f"{parts[0]} {path}"
+        if len(parts) >= 3:
+            modified_request_line += f" {parts[2]}"
+        modified_request_line += "\r\n"
+        
+        # Rebuild the full request with the modified request line
+        remaining_lines = "\r\n".join(lines[1:])
+        modified_request = modified_request_line.encode() + remaining_lines.encode()
+        
+        # Forward the modified request to target server
+        serverSocket.send(modified_request)
         
         # Receive response from target server
         response = b""
