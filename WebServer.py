@@ -1,5 +1,6 @@
 from socket import *
 import os
+# used for multi threading
 import threading
 from datetime import datetime, timezone
 from email.utils import format_datetime, parsedate_to_datetime
@@ -44,10 +45,6 @@ def _is_forbidden(requested_path: str) -> bool:
 
      return False
 
-
-
-
-
 #404 & 200 & 403 & 304
 def serve_html_file(file_name, request_headers=None):
      file_path = os.path.join(serverRoot, file_name)
@@ -63,6 +60,7 @@ def serve_html_file(file_name, request_headers=None):
                )
                return headers + error_content
 
+            # if not 403, proceed to check for 304
           try:
                # If-Modified-Since -> 304 Not Modified
                if request_headers and 'if-modified-since' in request_headers:
@@ -89,6 +87,7 @@ def serve_html_file(file_name, request_headers=None):
                with open(file_path, 'rb') as f:
                     content = f.read()
                # Round to whole seconds to align with HTTP-date precision
+               # goes to 200 if 403 & 304 not triggered
                mtime_sec = int(os.path.getmtime(file_path))
                headers = (
                     b"HTTP/1.1 200 OK\r\n"
@@ -98,6 +97,7 @@ def serve_html_file(file_name, request_headers=None):
                     b"Connection: close\r\n\r\n"
                )
                return headers + content
+           # exception created for 404 error
           except FileNotFoundError:
                error_content = b"<h1>404 Not Found</h1><p>This is Yan Ting and we cannot find the requested file.</p>"
                headers = (
@@ -118,10 +118,10 @@ def serve_html_file(file_name, request_headers=None):
                )
                return headers + error_content
      else:
-          # Root request: minimal 200 OK
+          # if all  checks are passed, send 200 OK
           return b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n"
 
-
+# created to process each client in a separate thread
 def handle_client(connectionSocket, addr):
      try:
           # Read from socket (but not address as in UDP)
@@ -170,6 +170,7 @@ while True: # Loop forever
      connectionSocket, addr = serverSocket.accept()
      
      # Create and start a new thread for each client
+     # passes connection socket and address to handle_client 
      client_thread = threading.Thread(target=handle_client, args=(connectionSocket, addr))
      client_thread.daemon = True  # Thread will exit when main program exits
      client_thread.start()
